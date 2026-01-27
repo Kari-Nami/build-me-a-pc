@@ -13,7 +13,7 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar__container">
-        <Link to="/" className="navbar__brand">BuildBoard</Link>
+        <Link to="/" className="navbar__brand">Build Me a PC</Link>
         <div className="navbar__links">
           {isAuthenticated && <Link to="/builds">My Builds</Link>}
           <Link to="/requests">Requests</Link>

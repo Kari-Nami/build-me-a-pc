@@ -53,7 +53,7 @@ export default function RegisterPage() {
     <div className="auth-page">
       <div className="card">
         <h1>Create Account</h1>
-        <p>Join the BuildBoard community</p>
+        <p>Join the Build Me a PC community</p>
 
         {error && <div className="alert alert--error">{error}</div>}
 

@@ -39,7 +39,7 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="card">
         <h1>Sign In</h1>
-        <p>Welcome back to BuildBoard</p>
+        <p>Welcome back to Build Me a PC</p>
 
         {error && <div className="alert alert--error">{error}</div>}
 

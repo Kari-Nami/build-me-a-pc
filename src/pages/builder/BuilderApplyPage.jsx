@@ -118,7 +118,7 @@ export default function BuilderApplyPage() {
           If you are a hobbyist builder, please contact the admins privately and provide a valid ID for verification.
         </div>
 
-        <p>Submit your business details to become a verified builder on BuildBoard.</p>
+        <p>Submit your business details to become a verified builder on Build Me a PC.</p>
 
         {error && <div className="alert alert--error">{error}</div>}
 

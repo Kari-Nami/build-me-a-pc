@@ -69,6 +69,11 @@ export default function RequestsPage() {
                 key={request.id}
                 className="card card--hover request-card"
               >
+                <img
+                  className="card__image"
+                  src="https://www.shutterstock.com/image-vector/gaming-pc-wireframe-drawing-line-600nw-2588972631.jpg"
+                  alt="PC Build"
+                />
                 <div className="card__header">
                   <h3 className="card__title">
                     {build ? build.title : 'Untitled Build'}

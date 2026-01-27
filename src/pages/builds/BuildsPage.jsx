@@ -82,6 +82,11 @@ export default function BuildsPage() {
         <div className="grid grid--3">
           {builds.map((build) => (
             <Link to={`/builds/${build.id}`} key={build.id} className="card card--hover">
+              <img
+                className="card__image"
+                src="https://www.shutterstock.com/image-vector/gaming-pc-wireframe-drawing-line-600nw-2588972631.jpg"
+                alt="PC Build"
+              />
               <div className="card__body">
                 <h3 className="card__title">{build.title}</h3>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>

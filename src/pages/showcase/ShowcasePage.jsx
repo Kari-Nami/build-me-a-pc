@@ -85,6 +85,11 @@ export default function ShowcasePage() {
                 key={build.id}
                 className="card card--hover"
               >
+                <img
+                  className="card__image"
+                  src="https://www.shutterstock.com/image-vector/gaming-pc-wireframe-drawing-line-600nw-2588972631.jpg"
+                  alt="PC Build"
+                />
                 <div className="card__body">
                   <h3 className="card__title">{build.title}</h3>
 

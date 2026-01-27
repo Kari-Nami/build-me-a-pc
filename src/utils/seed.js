@@ -24,5 +24,5 @@ export function initializeSeedData() {
   setCollection('builder_offers', []);
   setCollection('showcase_inquiries', []);
 
-  console.log('BuildBoard: Seed data initialized');
+  console.log('Build Me a PC: Seed data initialized');
 }

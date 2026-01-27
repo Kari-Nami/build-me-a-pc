@@ -235,6 +235,11 @@ export default function BuildCreatePage() {
 
         <div className="part-picker__sidebar">
           <div className="summary-panel">
+            <img
+              className="summary-panel__image"
+              src="https://www.shutterstock.com/image-vector/gaming-pc-wireframe-drawing-line-600nw-2588972631.jpg"
+              alt="PC Build"
+            />
             <h2>Build Summary</h2>
 
             {categories.map((cat) => {
