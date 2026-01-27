@@ -1,0 +1,278 @@
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useData } from '../../contexts/DataContext';
+import { checkCompatibility } from '../../utils/compatibility';
+import { formatCurrency } from '../../utils/helpers';
+
+export default function BuildEditPage() {
+  const { user } = useAuth();
+  const { getCategories, getParts, saveBuild, getItemById, getBuildParts } =
+    useData();
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [selectedParts, setSelectedParts] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [partsByCategory, setPartsByCategory] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  // Load categories, parts, and existing build data on mount
+  useEffect(() => {
+    const build = getItemById('builds', id);
+
+    if (!build) {
+      navigate('/builds', { replace: true });
+      return;
+    }
+
+    // Only the build owner can edit
+    if (user?.id !== build.user_id) {
+      navigate(`/builds/${id}`, { replace: true });
+      return;
+    }
+
+    // Populate form fields from existing build
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTitle(build.title || '');
+    setDescription(build.description || '');
+    setPurpose(build.purpose || '');
+
+    // Load categories and parts
+    const cats = getCategories();
+    setCategories(cats);
+
+    const partsMap = {};
+    cats.forEach((cat) => {
+      partsMap[cat.id] = getParts(cat.id);
+    });
+    setPartsByCategory(partsMap);
+
+    // Load existing build parts and map them to category slugs
+    const existingBuildParts = getBuildParts(id);
+    const partsSelection = {};
+    existingBuildParts.forEach((bp) => {
+      if (bp.category) {
+        partsSelection[bp.category.slug] = bp.part_id;
+      }
+    });
+    setSelectedParts(partsSelection);
+
+    setLoading(false);
+  }, [id, user, navigate, getCategories, getParts, getItemById, getBuildParts]);
+
+  // Build a map of category slug -> full part object for compatibility checking
+  const selectedPartObjects = useMemo(() => {
+    const map = {};
+    categories.forEach((cat) => {
+      const partId = selectedParts[cat.slug];
+      if (partId) {
+        const parts = partsByCategory[cat.id] || [];
+        const part = parts.find((p) => p.id === partId);
+        if (part) map[cat.slug] = part;
+      }
+    });
+    return map;
+  }, [selectedParts, categories, partsByCategory]);
+
+  // Run compatibility checks
+  const compatibilityIssues = useMemo(() => {
+    return checkCompatibility(selectedPartObjects);
+  }, [selectedPartObjects]);
+
+  const hasErrors = compatibilityIssues.some((i) => i.severity === 'error');
+
+  // Calculate total price
+  const totalPrice = useMemo(() => {
+    return Object.values(selectedPartObjects).reduce(
+      (sum, part) => sum + (part.price || 0),
+      0
+    );
+  }, [selectedPartObjects]);
+
+  const handlePartSelect = (slug, partId) => {
+    setSelectedParts((prev) => ({
+      ...prev,
+      [slug]: partId || null,
+    }));
+  };
+
+  const handleSave = (e, status) => {
+    e.preventDefault();
+
+    if (!title.trim()) return;
+
+    const buildData = {
+      id,
+      user_id: user.id,
+      title: title.trim(),
+      description: description.trim(),
+      purpose: purpose.trim(),
+      total_price: totalPrice,
+      status,
+    };
+
+    const build = saveBuild(buildData, selectedParts);
+    navigate(`/builds/${build.id}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="page">
+        <p>Loading build...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page">
+      <div className="page__header">
+        <h1>Edit Build</h1>
+        <p>Modify parts and details for your PC build.</p>
+      </div>
+
+      <div className="part-picker">
+        <div className="part-picker__categories">
+          <form onSubmit={(e) => handleSave(e, 'published')}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="build-title">
+                Build Title
+              </label>
+              <input
+                id="build-title"
+                className="form-input"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Ultimate Gaming Rig"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="build-description">
+                Description
+              </label>
+              <textarea
+                id="build-description"
+                className="form-input"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe your build..."
+                rows={3}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="build-purpose">
+                Purpose
+              </label>
+              <input
+                id="build-purpose"
+                className="form-input"
+                type="text"
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+                placeholder="e.g. Gaming, Content Creation, Workstation"
+              />
+            </div>
+
+            <hr />
+
+            {categories.map((cat) => {
+              const parts = partsByCategory[cat.id] || [];
+              const selectedId = selectedParts[cat.slug] || '';
+              const selectedPart = parts.find((p) => p.id === selectedId);
+
+              return (
+                <div className="part-category" key={cat.id}>
+                  <label className="part-category__label">{cat.name}</label>
+                  <select
+                    className="form-select part-category__select"
+                    value={selectedId}
+                    onChange={(e) => handlePartSelect(cat.slug, e.target.value)}
+                  >
+                    <option value="">-- Select {cat.name} --</option>
+                    {parts.map((part) => (
+                      <option key={part.id} value={part.id}>
+                        {part.name} - {formatCurrency(part.price)}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="part-category__price">
+                    {selectedPart ? formatCurrency(selectedPart.price) : ''}
+                  </span>
+                </div>
+              );
+            })}
+          </form>
+        </div>
+
+        <div className="part-picker__sidebar">
+          <div className="summary-panel">
+            <h2>Build Summary</h2>
+
+            {categories.map((cat) => {
+              const partId = selectedParts[cat.slug];
+              const parts = partsByCategory[cat.id] || [];
+              const part = parts.find((p) => p.id === partId);
+              if (!part) return null;
+
+              return (
+                <div className="summary-panel__item" key={cat.id}>
+                  <span>{cat.name}:</span>
+                  <span>
+                    {part.name} — {formatCurrency(part.price)}
+                  </span>
+                </div>
+              );
+            })}
+
+            <div className="summary-panel__total">
+              <strong>Total:</strong> {formatCurrency(totalPrice)}
+            </div>
+
+            {compatibilityIssues.length > 0 && (
+              <div className="compat-panel">
+                <h3>Compatibility</h3>
+                {compatibilityIssues.map((issue, idx) => (
+                  <div
+                    key={idx}
+                    className={`compat-alert compat-alert--${issue.severity}`}
+                  >
+                    <span className="compat-alert__icon">
+                      {issue.severity === 'error' ? '\u2718' : '\u26A0'}
+                    </span>
+                    {issue.message}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="summary-panel__actions">
+              <button
+                type="button"
+                className="btn btn--outline btn--block"
+                onClick={(e) => handleSave(e, 'draft')}
+                disabled={!title.trim()}
+              >
+                Save as Draft
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary btn--block"
+                onClick={(e) => handleSave(e, 'published')}
+                disabled={!title.trim() || hasErrors}
+              >
+                Publish Build
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

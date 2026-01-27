@@ -1,0 +1,456 @@
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency, formatDate } from '../../utils/helpers';
+
+const AVAILABILITY_BADGE = {
+  available: 'badge--success',
+  sold_out: 'badge--warning',
+  discontinued: 'badge--danger',
+};
+
+export default function ShowcaseDetailPage() {
+  const { id } = useParams();
+  const {
+    getItemById, getBuildParts, getUser, getBuilderProfile,
+    getRatings, getUserRating, addRating, getComments, createItem,
+    isLiked, toggleLike,
+  } = useData();
+  const { user, isAuthenticated } = useAuth();
+
+  const [build, setBuild] = useState(null);
+  const [parts, setParts] = useState([]);
+  const [builder, setBuilder] = useState(null);
+  const [builderProfile, setBuilderProfile] = useState(null);
+  const [ratings, setRatings] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+
+  // Inquiry form state
+  const [inquiryMessage, setInquiryMessage] = useState('');
+  const [inquirySubmitted, setInquirySubmitted] = useState(false);
+
+  // Rating form state
+  const [ratingScore, setRatingScore] = useState(5);
+  const [ratingReview, setRatingReview] = useState('');
+  const [hasRated, setHasRated] = useState(false);
+
+  // Comment form state
+  const [commentText, setCommentText] = useState('');
+
+  const loadData = () => {
+    const b = getItemById('builds', id);
+    if (!b) return;
+    setBuild(b);
+    setParts(getBuildParts(b.id));
+    setBuilder(getUser(b.user_id));
+    setBuilderProfile(getBuilderProfile(b.user_id));
+    setRatings(getRatings(b.id));
+    setComments(getComments(b.id));
+    setLikeCount(b.like_count || 0);
+    if (user) {
+      setLiked(isLiked(user.id, b.id));
+      setHasRated(!!getUserRating(user.id, b.id));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  if (!build) {
+    return (
+      <div className="page">
+        <div className="empty-state">
+          <p>Showcase build not found.</p>
+          <Link to="/showcase" className="btn btn--primary">Back to Showcase</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const isOwner = isAuthenticated && user.id === build.user_id;
+
+  const handleToggleLike = () => {
+    if (!isAuthenticated) return;
+    const nowLiked = toggleLike(user.id, build.id);
+    setLiked(nowLiked);
+    setLikeCount(prev => nowLiked ? prev + 1 : Math.max(0, prev - 1));
+  };
+
+  const handleSubmitRating = (e) => {
+    e.preventDefault();
+    if (!isAuthenticated || hasRated) return;
+    addRating({
+      build_id: build.id,
+      user_id: user.id,
+      score: Number(ratingScore),
+      review_text: ratingReview.trim() || null,
+    });
+    setRatingScore(5);
+    setRatingReview('');
+    setHasRated(true);
+    loadData();
+  };
+
+  const handleSubmitComment = (e) => {
+    e.preventDefault();
+    if (!isAuthenticated || !commentText.trim()) return;
+    createItem('comments', {
+      build_id: build.id,
+      user_id: user.id,
+      content: commentText.trim(),
+      parent_comment_id: null,
+    });
+    setCommentText('');
+    loadData();
+  };
+
+  const handleSubmitInquiry = (e) => {
+    e.preventDefault();
+    if (!isAuthenticated || !inquiryMessage.trim()) return;
+    createItem('showcase_inquiries', {
+      build_id: build.id,
+      builder_id: build.user_id,
+      user_id: user.id,
+      message: inquiryMessage.trim(),
+      status: 'pending',
+    });
+    setInquiryMessage('');
+    setInquirySubmitted(true);
+  };
+
+  // Build threaded comment tree
+  const topLevelComments = comments.filter(c => !c.parent_comment_id);
+  const getReplies = (parentId) => comments.filter(c => c.parent_comment_id === parentId);
+
+  return (
+    <div className="page">
+      <Link to="/showcase" className="btn btn--ghost" style={{ marginBottom: '1rem' }}>
+        &larr; Back to Showcase
+      </Link>
+
+      <div className="page-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '2rem', alignItems: 'start' }}>
+        {/* Main content */}
+        <div>
+          {/* Build info card */}
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <div className="card__header">
+              <h1 className="card__title">{build.title}</h1>
+              <span className={`badge ${AVAILABILITY_BADGE[build.availability_status] || 'badge--secondary'}`}>
+                {(build.availability_status || 'available').replace('_', ' ')}
+              </span>
+            </div>
+
+            <div className="card__body">
+              {build.description && <p>{build.description}</p>}
+
+              {build.specs_summary && (
+                <p style={{ color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+                  {build.specs_summary}
+                </p>
+              )}
+
+              <div className="showcase-card__price" style={{ fontSize: '1.5rem', fontWeight: '700', margin: '1rem 0' }}>
+                {formatCurrency(build.total_price || 0)}
+              </div>
+
+              {/* Social actions */}
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
+                {isAuthenticated && !isOwner && (
+                  <button
+                    className={`btn ${liked ? 'btn--danger' : 'btn--ghost'}`}
+                    onClick={handleToggleLike}
+                  >
+                    {liked ? '\u2665' : '\u2661'} {likeCount}
+                  </button>
+                )}
+                {(!isAuthenticated || isOwner) && (
+                  <span className="card__stat" title="Likes">&#9829; {likeCount}</span>
+                )}
+                <span className="card__stat" title="Rating">
+                  &#9733; {build.rating_avg ? build.rating_avg.toFixed(1) : '0.0'} ({build.rating_count || 0})
+                </span>
+              </div>
+
+              <div className="card__meta">
+                <span>{formatDate(build.created_at)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Parts table */}
+          {parts.length > 0 && (
+            <div className="card" style={{ marginBottom: '2rem' }}>
+              <div className="card__header">
+                <h2>Parts List</h2>
+              </div>
+              <div className="card__body">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Part</th>
+                      <th>Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parts.map((bp) => (
+                      <tr key={bp.id}>
+                        <td>{bp.category ? bp.category.name : 'Unknown'}</td>
+                        <td>{bp.part ? bp.part.name : 'Unknown Part'}</td>
+                        <td>{bp.part ? formatCurrency(bp.part.price) : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="2"><strong>Total</strong></td>
+                      <td><strong>{formatCurrency(build.total_price || 0)}</strong></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Inquiry form */}
+          {isAuthenticated && !isOwner && (
+            <div className="card" style={{ marginBottom: '2rem' }}>
+              <div className="card__header">
+                <h2>Send Inquiry</h2>
+              </div>
+              <div className="card__body">
+                {inquirySubmitted ? (
+                  <div className="alert alert--success">
+                    Your inquiry has been sent to the builder. They will reach out to you soon.
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmitInquiry}>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="inquiry-message">Message</label>
+                      <textarea
+                        id="inquiry-message"
+                        className="form-input"
+                        rows="4"
+                        value={inquiryMessage}
+                        onChange={(e) => setInquiryMessage(e.target.value)}
+                        placeholder="Interested in this build? Ask the builder a question or request more details..."
+                        required
+                      />
+                    </div>
+                    <button type="submit" className="btn btn--primary">Send Inquiry</button>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Ratings section */}
+          <div className="card" style={{ marginBottom: '2rem' }}>
+            <div className="card__header">
+              <h2>Ratings ({ratings.length})</h2>
+            </div>
+            <div className="card__body">
+              {/* Rating form */}
+              {isAuthenticated && !isOwner && !hasRated && (
+                <form onSubmit={handleSubmitRating} style={{ marginBottom: '1.5rem' }}>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="rating-score">Your Rating</label>
+                    <select
+                      id="rating-score"
+                      className="form-input"
+                      value={ratingScore}
+                      onChange={(e) => setRatingScore(e.target.value)}
+                      style={{ width: 'auto' }}
+                    >
+                      <option value="5">5 - Excellent</option>
+                      <option value="4">4 - Great</option>
+                      <option value="3">3 - Good</option>
+                      <option value="2">2 - Fair</option>
+                      <option value="1">1 - Poor</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="rating-review">Review (optional)</label>
+                    <textarea
+                      id="rating-review"
+                      className="form-input"
+                      rows="3"
+                      value={ratingReview}
+                      onChange={(e) => setRatingReview(e.target.value)}
+                      placeholder="Share your thoughts about this build..."
+                    />
+                  </div>
+                  <button type="submit" className="btn btn--primary">Submit Rating</button>
+                </form>
+              )}
+
+              {hasRated && (
+                <div className="alert alert--info" style={{ marginBottom: '1rem' }}>
+                  You have already rated this build.
+                </div>
+              )}
+
+              {ratings.length === 0 ? (
+                <p className="text--muted">No ratings yet. Be the first to rate this build.</p>
+              ) : (
+                <div className="rating-list">
+                  {ratings.map((rating) => {
+                    const rater = getUser(rating.user_id);
+                    return (
+                      <div key={rating.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '0.75rem 0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <strong>
+                            {rater ? (
+                              <Link to={`/profile/${rater.id}`}>{rater.display_name}</Link>
+                            ) : (
+                              'Unknown User'
+                            )}
+                          </strong>
+                          <span>
+                            {'★'.repeat(rating.score)}{'☆'.repeat(5 - rating.score)}
+                          </span>
+                        </div>
+                        {rating.review_text && <p style={{ marginTop: '0.25rem' }}>{rating.review_text}</p>}
+                        <span className="text--muted" style={{ fontSize: '0.85rem' }}>
+                          {formatDate(rating.created_at)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Comments section */}
+          <div className="card">
+            <div className="card__header">
+              <h2>Comments ({comments.length})</h2>
+            </div>
+            <div className="card__body">
+              {/* Comment form */}
+              {isAuthenticated && (
+                <form onSubmit={handleSubmitComment} style={{ marginBottom: '1.5rem' }}>
+                  <div className="form-group">
+                    <textarea
+                      className="form-input"
+                      rows="3"
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      placeholder="Leave a comment..."
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="btn btn--primary">Post Comment</button>
+                </form>
+              )}
+
+              {comments.length === 0 ? (
+                <p className="text--muted">No comments yet. Start the conversation.</p>
+              ) : (
+                <div className="comment-list">
+                  {topLevelComments.map((comment) => {
+                    const author = getUser(comment.user_id);
+                    const replies = getReplies(comment.id);
+                    return (
+                      <div key={comment.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '0.75rem 0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <strong>
+                            {author ? (
+                              <Link to={`/profile/${author.id}`}>{author.display_name}</Link>
+                            ) : (
+                              'Unknown User'
+                            )}
+                          </strong>
+                          <span className="text--muted" style={{ fontSize: '0.85rem' }}>
+                            {formatDate(comment.created_at)}
+                          </span>
+                        </div>
+                        <p>{comment.content}</p>
+
+                        {/* Replies */}
+                        {replies.length > 0 && (
+                          <div style={{ marginLeft: '1.5rem', borderLeft: '2px solid var(--color-border, #ddd)', paddingLeft: '1rem' }}>
+                            {replies.map((reply) => {
+                              const replyAuthor = getUser(reply.user_id);
+                              return (
+                                <div key={reply.id} style={{ padding: '0.5rem 0' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <strong>
+                                      {replyAuthor ? (
+                                        <Link to={`/profile/${replyAuthor.id}`}>{replyAuthor.display_name}</Link>
+                                      ) : (
+                                        'Unknown User'
+                                      )}
+                                    </strong>
+                                    <span className="text--muted" style={{ fontSize: '0.85rem' }}>
+                                      {formatDate(reply.created_at)}
+                                    </span>
+                                  </div>
+                                  <p>{reply.content}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar - Builder info */}
+        <div>
+          <div className="card" style={{ position: 'sticky', top: '1rem' }}>
+            <div className="card__header">
+              <h3>Builder</h3>
+            </div>
+            <div className="card__body">
+              {builder ? (
+                <div>
+                  <h4>
+                    <Link to={`/profile/${builder.id}`}>{builder.display_name}</Link>
+                  </h4>
+
+                  {builderProfile && (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      {builderProfile.business_name && (
+                        <p><strong>{builderProfile.business_name}</strong></p>
+                      )}
+                      {builderProfile.specialization && (
+                        <p className="text--muted">{builderProfile.specialization}</p>
+                      )}
+                      <div style={{ marginTop: '0.5rem' }}>
+                        {builderProfile.avg_rating != null && (
+                          <p>
+                            &#9733; {builderProfile.avg_rating.toFixed(1)} avg rating
+                          </p>
+                        )}
+                        {builderProfile.completed_builds != null && (
+                          <p>{builderProfile.completed_builds} builds completed</p>
+                        )}
+                        {builderProfile.years_of_experience != null && (
+                          <p>{builderProfile.years_of_experience} years experience</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text--muted">Builder information unavailable.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
