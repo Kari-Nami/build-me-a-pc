@@ -102,6 +102,15 @@ export default function RequestsPage() {
                     </p>
                   )}
 
+                  {request.preferred_builder_id && (() => {
+                    const preferredBuilder = getUser(request.preferred_builder_id);
+                    return preferredBuilder ? (
+                      <p className="card__description" style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>
+                        Wished to be built by {preferredBuilder.display_name}
+                      </p>
+                    ) : null;
+                  })()}
+
                   <div className="card__meta">
                     <span className="card__creator">
                       Posted by {poster ? poster.display_name : 'Unknown'}

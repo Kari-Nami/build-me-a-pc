@@ -73,7 +73,9 @@ export default function BuildDetailPage() {
   const [requestBudget, setRequestBudget] = useState('');
   const [requestPurpose, setRequestPurpose] = useState('');
   const [requestNotes, setRequestNotes] = useState('');
+  const [requestPreferredBuilder, setRequestPreferredBuilder] = useState('');
   const [requestCreated, setRequestCreated] = useState(false);
+  const [builders, setBuilders] = useState([]);
 
   const loadData = useCallback(() => {
     const b = getItemById('builds', id);
@@ -96,12 +98,16 @@ export default function BuildDetailPage() {
     setRatings(getRatings(id));
     setComments(getComments(id));
 
+    // Load builders for the preferred builder dropdown
+    const allUsers = queryItems('users', u => u.role === 'builder' || u.role === 'admin');
+    setBuilders(allUsers.filter(u => u.role === 'builder'));
+
     if (user) {
       setHasLiked(isLiked(user.id, id));
       const allRatings = getRatings(id);
       setHasRated(allRatings.some(r => r.user_id === user.id));
     }
-  }, [id, user, getItemById, getBuildParts, getRatings, getComments, isLiked]);
+  }, [id, user, getItemById, getBuildParts, getRatings, getComments, isLiked, queryItems]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -168,12 +174,12 @@ export default function BuildDetailPage() {
       budget: Number(requestBudget) || 0,
       purpose: requestPurpose.trim() || null,
       notes: requestNotes.trim() || null,
-      preferred_builder_id: null,
+      preferred_builder_id: requestPreferredBuilder || null,
       status: 'open',
     });
     setRequestCreated(true);
     setShowRequestForm(false);
-  }, [user, build, requestBudget, requestPurpose, requestNotes, createItem, queryItems]);
+  }, [user, build, requestBudget, requestPurpose, requestNotes, requestPreferredBuilder, createItem, queryItems]);
 
   const handleSubmitReply = useCallback((e) => {
     e.preventDefault();
@@ -614,6 +620,20 @@ export default function BuildDetailPage() {
                       onChange={(e) => setRequestNotes(e.target.value)}
                       placeholder="Any additional details for the builder"
                     />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="req-preferred-builder">Preferred Builder (optional)</label>
+                    <select
+                      id="req-preferred-builder"
+                      className="form-input"
+                      value={requestPreferredBuilder}
+                      onChange={(e) => setRequestPreferredBuilder(e.target.value)}
+                    >
+                      <option value="">No preference</option>
+                      {builders.map(b => (
+                        <option key={b.id} value={b.id}>{b.display_name}</option>
+                      ))}
+                    </select>
                   </div>
                   <button type="submit" className="btn btn--primary btn--block">
                     Submit Request

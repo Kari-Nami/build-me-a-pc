@@ -142,6 +142,16 @@ export default function RequestDetailPage() {
             <p><strong>Notes:</strong> {request.notes}</p>
           )}
 
+          {request.preferred_builder_id && (() => {
+            const preferredBuilder = getUser(request.preferred_builder_id);
+            return preferredBuilder ? (
+              <p style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>
+                Wished to be built by{' '}
+                <Link to={`/profile/${preferredBuilder.id}`}>{preferredBuilder.display_name}</Link>
+              </p>
+            ) : null;
+          })()}
+
           <div className="card__meta" style={{ marginTop: '1rem' }}>
             <span>
               Posted by{' '}
