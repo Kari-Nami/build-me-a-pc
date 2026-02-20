@@ -394,6 +394,8 @@ img { max-width: 100%; display: block; }
 .card--hover:hover {
   box-shadow: var(--shadow-md);
   border-color: var(--color-secondary);
+  text-decoration-line: none;
+  transition: all 200ms;
 }
 
 .card__header {
@@ -406,7 +408,6 @@ img { max-width: 100%; display: block; }
 .card__title {
   font-size: 1.125rem;
   font-weight: 600;
-  color: var(--color-text);
 }
 
 .card__body { margin-bottom: 1rem; }
